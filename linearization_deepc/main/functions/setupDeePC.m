@@ -1,4 +1,4 @@
-function [SysData, controlParams, figHandle] = setupDeePC(G, Ts, RandomSignalInfo, ctrlInputIdx, prevInputIdx, measNoiseSTD, N, f, p, plotIO)
+function [SysData, controlParams, figHandle] = setupDeePC(G, Ts, RandomSignalInfo, ctrlInputIdx, previewFlag, prevInputIdx, measNoiseSTD, N, f, p, plotIO)
 % setupDeePC(G,Ts, contrInpName, RandomSignalInfo, scalingFactors)
 % Function used to obtain signals for open loop training of DeePC and
 % training of DeePC.
@@ -77,21 +77,6 @@ controlParams.p = p;
 controlParams.f = f;
 
 %% Construct data matrices
-% Use preview information
-previewAns = input('Use preview information? y/n[y]: ','s');
-
-while not(isempty(previewAns)) && not(strcmp(previewAns,'y')) && ...
-        not(strcmp(previewAns,'n'))
-    disp('Invalid input.')
-    previewAns = input('Use preview information? y/n[y]: ','s');
-end
-
-if isempty(previewAns) || strcmp(previewAns,'y')
-    previewFlag = 1;
-elseif strcmp(previewAns,'n')
-    previewFlag = 0;
-end
-
 % Past data
 SysData.Up = constructHankelMat(SysData.OL.input(ctrlInputIdx).signal,i,p,Nbar);
 SysData.Yp = constructHankelMat(SysData.OL.output,i,p,Nbar);
@@ -133,7 +118,7 @@ controlParams.ubu = max(RandomSignalInfo(ctrlInputIdx).Range) * RandomSignalInfo
 % Input rate constraint
 du = deg2rad(8); % rad/s
 du = du * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
-controlParams.ubdu = du*Ts;
+controlParams.duf = du*Ts;
 
 end
 

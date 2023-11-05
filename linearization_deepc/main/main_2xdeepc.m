@@ -20,7 +20,7 @@ addpath(genpath('D:\Program Files\MATLAB\R2023a\yalmip')) % yalmip
 load('inputData\waveForces.mat','M_pitch');
 
 %% Load linearization
-load('inputData\linDataWave.mat');
+% load('inputData\linDataWave.mat');
 
 %% Find index of blade pitch, gen speed and wind speed
 % inputChannelsList = MBC.DescCntrlInpt;
