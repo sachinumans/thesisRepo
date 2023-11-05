@@ -222,7 +222,7 @@ SysDataWind.yini = constructHankelMat(SysDataWind.OL.output,i+N-p,p,1);
 if previewFlag
     WindData = zeros(length(SysDataWind.OL.input(prevInputIdxWind(1)).signal), length(prevInputIdxWind));
     for i = 1:length(prevInputIdxWind); WindData(:,i) = SysDataWind.OL.input(prevInputIdxWind(i)).signal; end
-    SysDataWind.wini = constructHankelMat(WindData,i+N-p,p,2);
+    SysDataWind.wini = constructHankelMat(WindData,i+N-p,p,1);
 else
     SysDataWind.wini = [];
 end
@@ -275,6 +275,7 @@ for k=1:kFinal
     % Wind preview
     if previewFlag == 1
         SysDataWind.wf = [vWind(k_wind_prev), uStar_ff*ones(length(ref_prev), 1)];
+        SysDataWind.wf = reshape(SysDataWind.wf',[],1);        
     else
         SysDataWind.wf = [];
     end
