@@ -1,4 +1,4 @@
-function uOpt = deepc(data,rf,controlParams,method,ivFlag,previewFlag)
+function uOpt = deepc(data,rf,inputOffset,controlParams,method,ivFlag,previewFlag)
 % deepc(data,rf,controlParams,method,ivFlag,previewFlag) Function used to
 % compute the DeePC optimal input.
 %
@@ -75,7 +75,8 @@ if method == 1 || method == 2  % QP or SDP
     % Decision variables
     g = ones(size(Z,1),1);
     uf = (pi/180)*ones(fIn,1);
-    z0 = [g; uf];    
+    z0 = [g; uf]; 
+    uf_offset = [zeros(length(g),1); inputOffset *ones(fIn, 1)];
 
     % Equality constraints: Aeq*z = beq
     Aeq = [Up*Z' zeros(pIn,fIn);
@@ -84,7 +85,7 @@ if method == 1 || method == 2  % QP or SDP
 
     beq = [uini;
         yini;
-        zeros(fIn,1)];
+        zeros(fIn,1)] - Aeq*uf_offset;
 
     if previewFlag == 1
         Aeq = [Aeq;
@@ -150,8 +151,11 @@ if method == 1 || method == 2  % QP or SDP
     opts = optimoptions('quadprog','Algorithm','active-set');
     % opts = optimoptions('quadprog','Algorithm','interior-point-convex');
     initPoint = struct('z',z0);
-    [sol,~,~,~] = solve(qprob,initPoint,'options',opts);
+    [sol,~,exitFlag,~] = solve(qprob,initPoint,'options',opts);
     z = sol.z;
+    if exitFlag < -1
+        error("Quadprog did not work")
+    end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%% quadprog %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     % H1 = Z*Yf.'*Q.^(1/2);

@@ -60,12 +60,27 @@ SysData.OL.output = y;
 
 if plotIO
     figHandle = figure;
+    subplot(1,2,1)
     plot(t,y)
     grid on
     xlabel('Time (in s)')
     ylabel('Rotor speed, scaled (-)')
     title('OL response to PE input - \omega_g around linearization point')
     set(gcf,'Color','White')
+    
+    subplot(1,2,2)
+    yyaxis left
+    plot(t,u(:,prevInputIdx))
+    ylabel('Disturbance')
+    grid on
+    yyaxis right
+    plot(t,u(:,ctrlInputIdx))
+    ylabel('Input')
+    grid on
+    xlabel('Time (in s)')
+    title('OL input & disturbances')
+    set(gcf,'Color','White')
+    
 end
 
 %% DeePC parameters
@@ -77,12 +92,14 @@ controlParams.p = p;
 controlParams.f = f;
 
 %% Construct data matrices
+inputData = zeros(nt, length(ctrlInputIdx));
+for i=1:length(ctrlInputIdx); inputData(:,i) = SysData.OL.input(ctrlInputIdx(i)).signal; end
 % Past data
-SysData.Up = constructHankelMat(SysData.OL.input(ctrlInputIdx).signal,i,p,Nbar);
+SysData.Up = constructHankelMat(inputData,i,p,Nbar);
 SysData.Yp = constructHankelMat(SysData.OL.output,i,p,Nbar);
 
 % Future data
-SysData.Uf = constructHankelMat(SysData.OL.input(ctrlInputIdx).signal,i+p,f,Nbar);
+SysData.Uf = constructHankelMat(inputData,i+p,f,Nbar);
 SysData.Yf = constructHankelMat(SysData.OL.output,i+p,f,Nbar);
 
 disturbMat = u(:, prevInputIdx);
@@ -102,7 +119,7 @@ end
 % output channels and the n-th element on the diagonal represents the
 % weight for the corresponding n-th output
 
-weightOutputs = 5e2*diag(1); %5e2
+weightOutputs = 5e4*diag(1); %5e2
 controlParams.Q = kron(eye(f),weightOutputs);
 
 % weightInputs diagonal matrix of size m-by-m, where m is the number of
