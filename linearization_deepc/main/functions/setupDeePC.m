@@ -129,8 +129,10 @@ weightInputs= 1*diag(1);
 controlParams.R = kron(eye(f),weightInputs);
 
 % Choose input bounds
-controlParams.lbu = min(RandomSignalInfo(ctrlInputIdx).Range) * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
-controlParams.ubu = max(RandomSignalInfo(ctrlInputIdx).Range) * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
+% controlParams.lbu = min(RandomSignalInfo(ctrlInputIdx).Range) * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
+% controlParams.ubu = max(RandomSignalInfo(ctrlInputIdx).Range) * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
+controlParams.lbu = -1;
+controlParams.ubu = 1;
 
 % Input rate constraint
 du = deg2rad(8); % rad/s

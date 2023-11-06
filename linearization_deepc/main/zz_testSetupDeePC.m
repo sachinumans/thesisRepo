@@ -197,17 +197,17 @@ RandomSignalInfo(3).Type = 'constZero'; % w_wave
 RandomSignalInfo(1).Band = [0 1/10];
 RandomSignalInfo(2).Band = [0 1]; % White noise
 RandomSignalInfo(3).Band = [];
-RandomSignalInfo(1).Range = [-uhat_max uhat_max];
-RandomSignalInfo(2).Range = [-v0hat_max v0hat_max];
+RandomSignalInfo(1).Range = [-1 1];
+RandomSignalInfo(2).Range = [-1/3 1/3];
 RandomSignalInfo(3).Range = [];
-RandomSignalInfo(1).ScalingFactor = 1/uhat_max;
-RandomSignalInfo(2).ScalingFactor = 0.5/v0hat_max;
+RandomSignalInfo(1).ScalingFactor = 1;
+RandomSignalInfo(2).ScalingFactor = 1;
 RandomSignalInfo(3).ScalingFactor = 0;
 
 ctrlInputIdxWind = 1;
 prevInputIdxWind = 2;
 measNoiseSTD = 5e-5;
-NWind = 600;
+NWind = 400;
 fWind = 40;
 pWind = 20;
 
@@ -215,27 +215,28 @@ plotIO = true;
 
 [SysDataWind, controlParamsWind, figHandlesWind] = setupDeePC(G, Ts_wind...
     , RandomSignalInfo, ctrlInputIdxWind, previewFlag, prevInputIdxWind, measNoiseSTD, NWind, fWind, pWind, plotIO);
+controlParamsWind.Q = 100;
 
 %%% Wave rejection
 for i=1:length(G.InputName); RandomSignalInfo(i).inputName = G.InputName(i); end
 RandomSignalInfo(1).Type = 'PRBS';      % u_bp
 RandomSignalInfo(2).Type = 'constZero'; % w_wind
 RandomSignalInfo(3).Type = 'rgs';       % w_wave
-RandomSignalInfo(1).Band = [0 1/3];
+RandomSignalInfo(1).Band = [0 1/10];
 RandomSignalInfo(2).Band = [];
 RandomSignalInfo(3).Band = [0 1];
-RandomSignalInfo(1).Range = [-uhat_max uhat_max];
+RandomSignalInfo(1).Range = [-0.2 0.2];
 RandomSignalInfo(2).Range = [];
-RandomSignalInfo(3).Range = [-v0hat_max v0hat_max];
-RandomSignalInfo(1).ScalingFactor = 1/uhat_max;
+RandomSignalInfo(3).Range = [-1/3 1/3];
+RandomSignalInfo(1).ScalingFactor = 1;
 RandomSignalInfo(2).ScalingFactor = 0;
-RandomSignalInfo(3).ScalingFactor = std(M_pitch)/MpitchHat_max;
+RandomSignalInfo(3).ScalingFactor = 1;
 
 ctrlInputIdxWave = 1;
 prevInputIdxWave = 3;
-measNoiseSTD = 5e-2;
-NWave = 300;
-fWave = 20;
+measNoiseSTD = 5e-5;
+NWave = 500;
+fWave = 10;
 pWave = 5;
 
 plotIO = true;
@@ -243,11 +244,11 @@ plotIO = true;
 [SysDataWave, controlParamsWave, figHandlesWave] = setupDeePC(G, Ts_wave...
     , RandomSignalInfo, ctrlInputIdxWave, previewFlag, prevInputIdxWave, measNoiseSTD, NWave, fWave, pWave, plotIO);
 
-controlParamsWave.Q = controlParamsWave.Q *30;
+controlParamsWave.Q = 1000;
 measNoiseSTD = 5e-5;
 
 %% Set up control loop
-kFinal = 1.5*max([fWave*Ts_ratio, fWind, 2400]); % simulation steps
+kFinal = 1.5*max([fWave*Ts_ratio, fWind, 1400]); % simulation steps
 Ts = SysDataWind.discreteSS.Ts;
 tsim = 0:Ts:Ts*(kFinal-1);
 nInputsWind = 1;
@@ -274,7 +275,7 @@ out = zeros(nOutputs,kFinal);
 
 %% CL disturbances
 G_d = SysDataWind.discreteSS;
-vWind = min(max(randn(kFinal+controlParamsWind.f, 1)/v0hat_max, -1), 1) *1; % Steady wind
+vWind = min(max(randn(kFinal+controlParamsWind.f, 1)/v0hat_max, -1), 1) *0; % Steady wind
 Mp = M_pitch./MpitchHat_max *1;
 
 %% Solve the constrained optimization problem
@@ -321,6 +322,7 @@ for k=1:kFinal
         % Wave preview
         if previewFlag == 1
             SysDataWave.wf = Mp(k_wave_prev);
+            SysDataWave.wf = reshape(SysDataWave.wf',[],1);
         else
             SysDataWind.wf = [];
         end
@@ -331,14 +333,14 @@ for k=1:kFinal
 
     uSeq(2,k) = uStar_ff;
 
-    if true
+    if false
         % Wind reference trajectory
         k_wind_prev = k:k+(controlParamsWind.f-1);
         ref_prev = ref(k_wind_prev);
 
         % Wind preview
         if previewFlag == 1
-            SysDataWind.wf = [vWind(k_wind_prev)]; %, uStar_ff*ones(length(ref_prev), 1)];
+            SysDataWind.wf = vWind(k_wind_prev);
             SysDataWind.wf = reshape(SysDataWind.wf',[],1);
         else
             SysDataWind.wf = [];
@@ -350,7 +352,7 @@ for k=1:kFinal
     uSeq(1,k) = uStar_fb;
 
     %%% Propagate model
-    uStar_bp = min(max(uStar_fb + uStar_ff, -uhat_max), uhat_max);
+    uStar_bp = min(max(uStar_fb + uStar_ff, -1), 1);
     u = [uStar_bp;
         vWind(k);
         Mp(k)];
@@ -369,7 +371,7 @@ for k=1:kFinal
     if mod(k, Ts_ratio) == 1 && k~=1
         % Update past data with most recent I/O data
         SysDataWave.uini = [SysDataWave.uini(nInputsWave+1:end); uStar_ff];
-        SysDataWave.yini = [SysDataWave.yini(nOutputs+1:end); out(:,k-1)];
+        SysDataWave.yini = [SysDataWave.yini(nOutputs+1:end); out(:,k)];
         if previewFlag == 1
             SysDataWave.wini = [SysDataWave.wini(nDistWave+1:end); Mp(k)];
         end
