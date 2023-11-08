@@ -125,7 +125,7 @@ controlParams.Q = kron(eye(f),weightOutputs);
 % weightInputs diagonal matrix of size m-by-m, where m is the number of
 % input channels and the n-th element on the diagonal represents the weight
 % for the corresponding n-th input
-weightInputs= 1*diag(1);
+weightInputs= 1*eye(length(ctrlInputIdx));
 controlParams.R = kron(eye(f),weightInputs);
 
 % Choose input bounds
@@ -135,8 +135,8 @@ controlParams.lbu = -1;
 controlParams.ubu = 1;
 
 % Input rate constraint
-du = deg2rad(8); % rad/s
-du = du * RandomSignalInfo(ctrlInputIdx).ScalingFactor;
+du = 0.8; 
+du = du * max(RandomSignalInfo(ctrlInputIdx).ScalingFactor);
 controlParams.duf = du*Ts;
 
 end

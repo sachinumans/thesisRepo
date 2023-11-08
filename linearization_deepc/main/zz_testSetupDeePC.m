@@ -107,8 +107,8 @@ G.inputName = {'u_bp', 'w_wind', 'w_wave'};
 G.outputName = {'RotorSpeed'};
 
 %% Append system
-% inputSumBlock = sumblk('u_bp = u_ff + u_fb');
-% G_splitInput = connect(inputSumBlock, G, {'u_fb', 'u_ff', 'w_wind', 'w_wave'}, {'RotorSpeed'});
+inputSumBlock = sumblk('u_bp = u_ff + u_fb');
+G_splitInput = connect(inputSumBlock, G, {'u_fb', 'u_ff', 'w_wind', 'w_wave'}, {'RotorSpeed'});
 
 
 % %% Discretize and get OL data
@@ -190,34 +190,41 @@ Ts_ratio = Ts_wave/Ts_wind; % newTs/oldTs, only works when newTs is a multiple o
 % M_pitch = M_pitch(1:Ts_ratio:end);
 
 %%% Wind rejection
-for i=1:length(G.InputName); RandomSignalInfo(i).inputName = G.InputName(i); end
-RandomSignalInfo(1).Type = 'PRBS';      % u_bp
-RandomSignalInfo(2).Type = 'rgs';       % w_wind
-RandomSignalInfo(3).Type = 'constZero'; % w_wave
-RandomSignalInfo(1).Band = [0 1/10];
-RandomSignalInfo(2).Band = [0 1]; % White noise
-RandomSignalInfo(3).Band = [];
-RandomSignalInfo(1).Range = [-1 1];
-RandomSignalInfo(2).Range = [-1/3 1/3];
-RandomSignalInfo(3).Range = [];
+for i=1:length(G_splitInput.InputName); RandomSignalInfo(i).inputName = G_splitInput.InputName(i); end
+RandomSignalInfo(1).Type = 'PRBS';      % u_fb
+RandomSignalInfo(2).Type = 'PRBS';      % u_ff
+RandomSignalInfo(3).Type = 'rgs';       % w_wind
+RandomSignalInfo(4).Type = 'PRBS'; % w_wave
+RandomSignalInfo(1).Band = [0 1/5];
+RandomSignalInfo(2).Band = [0 1/20];
+RandomSignalInfo(3).Band = [0 1]; % White noise
+RandomSignalInfo(4).Band = [0 1/20];
+RandomSignalInfo(1).Range = [-0.8 0.8];
+RandomSignalInfo(2).Range = [-0.5 0.5];
+RandomSignalInfo(3).Range = [-1/3 1/3];
+RandomSignalInfo(4).Range = [-0.5 0.5];
 RandomSignalInfo(1).ScalingFactor = 1;
 RandomSignalInfo(2).ScalingFactor = 1;
-RandomSignalInfo(3).ScalingFactor = 0;
+RandomSignalInfo(3).ScalingFactor = 1;
+RandomSignalInfo(4).ScalingFactor = 0;
 
-ctrlInputIdxWind = 1;
-prevInputIdxWind = 2;
+ctrlInputIdxWind = [1 2];
+% prevInputIdxWind = [3 4];
+prevInputIdxWind = 3;
 measNoiseSTD = 5e-5;
-NWind = 400;
+NWind = 500;
 fWind = 40;
 pWind = 20;
 
 plotIO = true;
 
-[SysDataWind, controlParamsWind, figHandlesWind] = setupDeePC(G, Ts_wind...
+[SysDataWind, controlParamsWind, figHandlesWind] = setupDeePC(G_splitInput, Ts_wind...
     , RandomSignalInfo, ctrlInputIdxWind, previewFlag, prevInputIdxWind, measNoiseSTD, NWind, fWind, pWind, plotIO);
 controlParamsWind.Q = 100;
 
 %%% Wave rejection
+clearvars RandomSignalInfo
+
 for i=1:length(G.InputName); RandomSignalInfo(i).inputName = G.InputName(i); end
 RandomSignalInfo(1).Type = 'PRBS';      % u_bp
 RandomSignalInfo(2).Type = 'constZero'; % w_wind
@@ -227,15 +234,15 @@ RandomSignalInfo(2).Band = [];
 RandomSignalInfo(3).Band = [0 1];
 RandomSignalInfo(1).Range = [-0.2 0.2];
 RandomSignalInfo(2).Range = [];
-RandomSignalInfo(3).Range = [-1/3 1/3];
+RandomSignalInfo(3).Range = [-1/4 1/4];
 RandomSignalInfo(1).ScalingFactor = 1;
 RandomSignalInfo(2).ScalingFactor = 0;
 RandomSignalInfo(3).ScalingFactor = 1;
 
 ctrlInputIdxWave = 1;
 prevInputIdxWave = 3;
-measNoiseSTD = 5e-5;
-NWave = 500;
+measNoiseSTD = 5e-1;
+NWave = 600;
 fWave = 10;
 pWave = 5;
 
@@ -244,14 +251,15 @@ plotIO = true;
 [SysDataWave, controlParamsWave, figHandlesWave] = setupDeePC(G, Ts_wave...
     , RandomSignalInfo, ctrlInputIdxWave, previewFlag, prevInputIdxWave, measNoiseSTD, NWave, fWave, pWave, plotIO);
 
-controlParamsWave.Q = 1000;
+controlParamsWave.Q = 100;
 measNoiseSTD = 5e-5;
 
 %% Set up control loop
-kFinal = 1.5*max([fWave*Ts_ratio, fWind, 1400]); % simulation steps
+G_d = c2d(G, Ts_wind);
+kFinal = 1.5*max([fWave*Ts_ratio, fWind, 800]); % simulation steps
 Ts = SysDataWind.discreteSS.Ts;
 tsim = 0:Ts:Ts*(kFinal-1);
-nInputsWind = 1;
+nInputsWind = 2;
 nDistWind = 1;
 nInputsWave = 1;
 nDistWave = 1;
@@ -262,7 +270,7 @@ ref = zeros(kFinal+max(controlParamsWind.f, Ts_ratio*controlParamsWave.f), 1);
 % ref(200:end) = 100; % step in reference
 
 % Keep track of states
-nStates_G = size(SysDataWind.discreteSS.A,1);
+nStates_G = size(G_d.A,1);
 x_G = zeros(nStates_G, kFinal+1);
 
 % Set initial condition
@@ -274,8 +282,7 @@ uSeq = zeros(nInputsWave+nInputsWind, kFinal);
 out = zeros(nOutputs,kFinal);
 
 %% CL disturbances
-G_d = SysDataWind.discreteSS;
-vWind = min(max(randn(kFinal+controlParamsWind.f, 1)/v0hat_max, -1), 1) *0; % Steady wind
+vWind = min(max(randn(kFinal+controlParamsWind.f, 1)/v0hat_max, -1), 1) *1;
 Mp = M_pitch./MpitchHat_max *1;
 
 %% Solve the constrained optimization problem
@@ -285,12 +292,18 @@ method = 1;
 %% Control loop
 %%% Past data for prediction
 % Wind
-SysDataWind.uini = constructHankelMat(SysDataWind.OL.input(ctrlInputIdxWind).signal,i+NWind-pWind,pWind,1);
+WindData = zeros(length(SysDataWind.OL.input(prevInputIdxWind(1)).signal), length(ctrlInputIdxWind));
+for i = 1:length(ctrlInputIdxWind); WindData(:,i) = SysDataWind.OL.input(ctrlInputIdxWind(i)).signal; end
+SysDataWind.uini = constructHankelMat(WindData,i+NWind-pWind,pWind,1);
 SysDataWind.yini = constructHankelMat(SysDataWind.OL.output,i+NWind-pWind,pWind,1);
 if previewFlag
     WindData = zeros(length(SysDataWind.OL.input(prevInputIdxWind(1)).signal), length(prevInputIdxWind));
     for i = 1:length(prevInputIdxWind); WindData(:,i) = SysDataWind.OL.input(prevInputIdxWind(i)).signal; end
     SysDataWind.wini = constructHankelMat(WindData,i+NWind-pWind,pWind,1);
+
+%     SysDataWind.wf = [vWind(1:controlParamsWind.f) Mp(1:controlParamsWind.f)];
+    SysDataWind.wf = vWind(1:controlParamsWind.f);
+    SysDataWind.wf = reshape(SysDataWind.wf',[],1);
 else
     SysDataWind.wini = [];
 end
@@ -328,7 +341,8 @@ for k=1:kFinal
         end
 
         % DeePC optimal control input for wave
-        uStar_ff = deepc(SysDataWave,ref_prev,0,controlParamsWave,method,ivFlag,previewFlag);
+        uStar_ff = deepc(SysDataWave,ref_prev,[],controlParamsWave,method,ivFlag,previewFlag);
+        uStar_ff = min(max(uStar_ff, -1), 1);
     end
 
     uSeq(2,k) = uStar_ff;
@@ -340,6 +354,7 @@ for k=1:kFinal
 
         % Wind preview
         if previewFlag == 1
+%             SysDataWind.wf = [vWind(k_wind_prev) Mp(k_wind_prev)];
             SysDataWind.wf = vWind(k_wind_prev);
             SysDataWind.wf = reshape(SysDataWind.wf',[],1);
         else
@@ -347,7 +362,9 @@ for k=1:kFinal
         end
 
         % DeePC optimal control input for wind
-        uStar_fb = deepc(SysDataWind,ref_prev,0,controlParamsWind,method,ivFlag,previewFlag);
+%         uStar_fb2 = deepc(SysDataWind,ref_prev,[nan uStar_ff],controlParamsWind,method,ivFlag,previewFlag);
+        uStar_fb2 = deepc(SysDataWind,ref_prev,[],controlParamsWind,method,ivFlag,previewFlag);
+        uStar_fb = min(max(uStar_fb2(1), -1), 1);   
     end
     uSeq(1,k) = uStar_fb;
 
@@ -362,10 +379,12 @@ for k=1:kFinal
     out(:,k) = G_d.C*x_G(:,k) + G_d.D*u + measNoiseSTD.*randn(size(out(:,k)));
 
     % Update past data with most recent I/O data
-    SysDataWind.uini = [SysDataWind.uini(nInputsWind+1:end); uStar_fb];
+    SysDataWind.uini = [SysDataWind.uini(nInputsWind+1:end); [uStar_fb; uStar_ff]];
     SysDataWind.yini = [SysDataWind.yini(nOutputs+1:end); out(:,k)];
     if previewFlag == 1
+%         SysDataWind.wini = [SysDataWind.wini(nDistWind+1:end); [vWind(k); Mp(k)]];
         SysDataWind.wini = [SysDataWind.wini(nDistWind+1:end); vWind(k)];
+        SysDataWind.wini = reshape(SysDataWind.wini',[],1);
     end
 
     if mod(k, Ts_ratio) == 1 && k~=1
@@ -384,7 +403,7 @@ toc
 i = 1;
 figure(WindowState="maximized")
 ax(i) = subplot(1,2, 1); i = i+1;
-plot(tsim, out); hold on
+plot(tsim, out.*ehat_max); hold on
 xline(Ts_wind*controlParamsWind.f, label='Wind preview start')
 xline(Ts_wave*controlParamsWave.f, label='Wave preview start')
 grid on

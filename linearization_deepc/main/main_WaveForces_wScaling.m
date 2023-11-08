@@ -7,14 +7,14 @@ rng('default')
 addpath(genpath('..\matlab-toolbox'));
 addpath(genpath('..\matlab-toolbox\Utilities'));
 addpath(genpath('functions'))
-% Insert full path to casadi lib
-addpath(genpath('D:\Program Files\MATLAB\R2023a\casadi'));
-import casadi.*
-% YALMIP and solvers
-addpath(genpath('D:\Program Files\mosek\10.1\toolbox\r2017aom')) %MOSEK
-addpath(genpath('D:\Program Files\MATLAB\R2023a\sedumi')) % sedumi
-addpath(genpath('D:\Program Files\MATLAB\R2023a\sdpt3')) % sdpt3
-addpath(genpath('D:\Program Files\MATLAB\R2023a\yalmip')) % yalmip
+% % Insert full path to casadi lib
+% addpath(genpath('D:\Program Files\MATLAB\R2023a\casadi'));
+% import casadi.*
+% % YALMIP and solvers
+% addpath(genpath('D:\Program Files\mosek\10.1\toolbox\r2017aom')) %MOSEK
+% addpath(genpath('D:\Program Files\MATLAB\R2023a\sedumi')) % sedumi
+% addpath(genpath('D:\Program Files\MATLAB\R2023a\sdpt3')) % sdpt3
+% addpath(genpath('D:\Program Files\MATLAB\R2023a\yalmip')) % yalmip
 
 %% Get preview data
 % outFile = 'D:\Master\TUD\Y2\Thesis\matlab\fromAmr\FF_OpenFAST\5MW_OC3Spar_DLL_WTurb_WavesIrr\5MW_OC3Spar_DLL_WTurb_WavesIrr.SFunc.out';
@@ -36,7 +36,7 @@ M_pitch = M_pitch(1:20:end); % 1/0.05
 % cd ..\main
 % save('inputData\linDataWave.mat','VTK','FAST_linData','LTIsys','matData','MBC');
 
-load('inputData\linDataWave.mat');
+% load('inputData\linDataWave.mat');
 
 %% Find index of blade pitch, gen speed and wind speed
 % inputChannelsList = MBC.DescCntrlInpt;
@@ -378,7 +378,7 @@ for k=1:kFinal
     end
 
     % DeePC optimal control input
-    uStar = deepc(data,rf,controlParams,method,ivFlag,previewFlag);
+    uStar = deepc(data,rf,0,controlParams,method,ivFlag,previewFlag);
     uSeq(:,k) = uStar;
 
     u = [uStar;

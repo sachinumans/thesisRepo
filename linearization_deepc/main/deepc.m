@@ -75,8 +75,7 @@ if method == 1 || method == 2  % QP or SDP
     % Decision variables
     g = ones(size(Z,1),1);
     uf = (pi/180)*ones(fIn,1);
-    z0 = [g; uf]; 
-    uf_offset = [zeros(length(g),1); inputOffset *ones(fIn, 1)];
+    z0 = [g; uf];
 
     % Equality constraints: Aeq*z = beq
     Aeq = [Up*Z' zeros(pIn,fIn);
@@ -85,7 +84,7 @@ if method == 1 || method == 2  % QP or SDP
 
     beq = [uini;
         yini;
-        zeros(fIn,1)] - Aeq*uf_offset;
+        zeros(fIn,1)];
 
     if previewFlag == 1
         Aeq = [Aeq;
@@ -95,6 +94,23 @@ if method == 1 || method == 2  % QP or SDP
         beq = [beq;
             wini;
             wf];
+    end
+
+    if ~isempty(inputOffset)
+        idx = 1;
+        for os = inputOffset
+            if isnan(os)
+                idx = idx+1;
+                continue
+            end
+            ptrn = zeros(1, nInputs);
+            ptrn(idx) = 1;
+            Aeq = [Aeq;
+                    [zeros(f,length(g)), kron(eye(f), ptrn)]];
+            beq = [beq;
+                    [os*ones(f, 1)]];
+            idx = idx+1;
+        end
     end
 
     % Inequality constraints: A*z <= b
@@ -145,7 +161,7 @@ if method == 1 || method == 2  % QP or SDP
     qprob = optimproblem("Objective",objFcn);
 
     constr.eq = Aeq*z == beq;
-    constr.ineq = Aineq*z <= bineq;   
+%     constr.ineq = Aineq*z <= bineq;   
     qprob.Constraints = constr;
 
     opts = optimoptions('quadprog','Algorithm','active-set');
@@ -154,7 +170,7 @@ if method == 1 || method == 2  % QP or SDP
     [sol,~,exitFlag,~] = solve(qprob,initPoint,'options',opts);
     z = sol.z;
     if exitFlag < -1
-        error("Quadprog did not work")
+        warning("Quadprog did not work")
     end
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%% quadprog %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
